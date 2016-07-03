@@ -9,6 +9,7 @@ def Pause():
 
 img = cv2.imread('img/car-plate1.jpg')
 img = cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+print img.shape
 
 # Blur the image
 blurred = cv2.GaussianBlur(img,(5,5),0)
@@ -43,7 +44,7 @@ cnt,h = cv2.findContours(morphed_copy,cv2.cv.CV_RETR_EXTERNAL,cv2.cv.CV_CHAIN_AP
 print 'Num of contours: {0}'.format(len(cnt))
 
 # Get the top 20 largest contours
-cnt_sorted = sorted(cnt,key=cv2.contourArea,reverse=True)[:2]
+cnt_sorted = sorted(cnt,key=cv2.contourArea,reverse=True)[:5]
 
 # For each contour, find the bounding rectangle of minimal area
 # Using these rects, do some basic validation, e.g. check the aspect ratio, to filter off
@@ -53,6 +54,11 @@ cnt_sorted = sorted(cnt,key=cv2.contourArea,reverse=True)[:2]
 morphed_color = cv2.cvtColor(morphed,cv2.COLOR_GRAY2BGR)
 
 rectArray = []
+aspectRatio = 4 # width / height
+errorAspectRatio = 0.5
+minAspectRatio = aspectRatio - errorAspectRatio
+maxAspectRatio = aspectRatio + errorAspectRatio
+carPlateRect = {}
 
 for c in cnt_sorted:
 	# Draw original contour
@@ -60,20 +66,30 @@ for c in cnt_sorted:
 	
 	# draw bounding rect
 	x,y,w,h = cv2.boundingRect(c) # returns (x,y,w,h)
-	cv2.rectangle(morphed_color,(x,y),(x+w,y+h),(255,0,0),2)
-	
-	# draw minAreaRect
-	rect = cv2.minAreaRect(c) # returns ((pt1.x, pt1.y),(pt2.x,pt2.y),degrees)
-	box = cv2.cv.BoxPoints(rect)
-	box = np.int0(box)
-	cv2.drawContours(morphed_color,[box],0,(0,0,255),2)
+	rectAspectRatio = float(w) / h
+
+	# if matches aspect ratio, draw in blue, else in red
+	if rectAspectRatio > minAspectRatio and rectAspectRatio < maxAspectRatio:
+		print 'Rect fits aspectRatio: {0}'.format(rectAspectRatio)
+		cv2.rectangle(morphed_color,(x,y),(x+w,y+h),(255,0,0),2)
+		carPlateRect['x'] = x
+		carPlateRect['y'] = y
+		carPlateRect['w'] = w
+		carPlateRect['h'] = h
+
+	else:
+		print 'Rect does not fit aspectRatio: {0}'.format(rectAspectRatio)
+		cv2.rectangle(morphed_color,(x,y),(x+w,y+h),(0,0,255),2)
 
 	cv2.imshow('morphed',morphed_color)
 	Pause()
 	cv2.destroyAllWindows()
 
+print carPlateRect
+
 # Crop these areas out
 # resize to same width / height, and apply light histogram equalization -> better for training
+carPlateImg = img[carPlateRect['y']:carPlateRect['y'] + carPlateRect['h'], carPlateRect['x']: carPlateRect['x'] + carPlateRect['w']]
 
-cv2.imshow('morphed',morphed_color)
+cv2.imshow('carPlate',carPlateImg)
 Pause()
